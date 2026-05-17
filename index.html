@@ -474,9 +474,48 @@ function getHighMed(risks) {
 }
 
 function dealHealthScore(deal) {
-  const risks = getRisks(deal);
-  const {high, med} = getHighMed(risks);
-  return Math.max(0, 100 - high*25 - med*10);
+  const bench = getBenchmarks(deal.stage, deal.tier);
+  const dis = parseInt(deal.daysInStage) || 0;
+  const age = parseInt(deal.age) || 0;
+
+  // 1. Stage benchmark pace (35 pts)
+  var stagePts = 0;
+  if (dis <= bench.goal) {
+    stagePts = 35;
+  } else if (dis < bench.current) {
+    stagePts = Math.round(35 * (1 - (dis - bench.goal) / (bench.current - bench.goal)));
+  }
+
+  // 2. Activity & confidence signals (40 pts)
+  var actPts = 0;
+  var hasNextStep = !!(deal.nextStep && deal.nextStep.trim());
+  if (hasNextStep) actPts += 15;
+  if (deal.nextStepDate) {
+    var nsd = new Date(deal.nextStepDate);
+    if (!isNaN(nsd)) {
+      var daysOverdue = Math.floor((TODAY - nsd) / 86400000);
+      if (daysOverdue <= 0) actPts += 10;
+      else if (daysOverdue <= 3) actPts += 5;
+    }
+  } else if (hasNextStep) {
+    actPts += 5;
+  }
+  var dsa = (deal.daysSinceActivity !== undefined && deal.daysSinceActivity !== null)
+    ? parseInt(deal.daysSinceActivity) : 99;
+  if (dsa <= 3) actPts += 10;
+  else if (dsa <= 7) actPts += 8;
+  else if (dsa <= 14) actPts += 5;
+  else if (dsa <= 21) actPts += 2;
+  if (!deal.blockers || !deal.blockers.trim()) actPts += 5;
+
+  // 3. Deal cycle target <30 days (25 pts)
+  var cyclePts = 0;
+  if (age <= 30) cyclePts = 25;
+  else if (age <= 45) cyclePts = 15;
+  else if (age <= 60) cyclePts = 8;
+  else if (age <= 90) cyclePts = 3;
+
+  return stagePts + actPts + cyclePts;
 }
 
 function repHealthScore(deals) {
@@ -486,14 +525,14 @@ function repHealthScore(deals) {
 }
 
 function healthClass(pct) {
-  if (pct >= 85) return "green";
-  if (pct >= 65) return "yellow";
+  if (pct >= 75) return "green";
+  if (pct >= 50) return "yellow";
   return "red";
 }
 
 function healthColor(pct) {
-  if (pct >= 85) return "#38a169";
-  if (pct >= 65) return "#d69e2e";
+  if (pct >= 75) return "#38a169";
+  if (pct >= 50) return "#d69e2e";
   return "#e53e3e";
 }
 
@@ -1105,7 +1144,7 @@ function renderDealCard(deal) {
 
 function getCoachingInsight(deal, riskLabel) {
   var stage = deal.stage || "";
-  var dis   = parseInt(deal.daysInStage) || 0;
+  var dis = parseInt(deal.daysInStage) || 0;
   var h = 0;
   var seed = (deal.id || "") + riskLabel;
   for (var i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
@@ -1114,139 +1153,139 @@ function getCoachingInsight(deal, riskLabel) {
   if (riskLabel === "No next step defined") {
     var tips = {
       "Pre-qualified": [
-        "Iannarino's golden rule: every conversation ends with a commitment. Offer two specific times — 'Is Thursday at 2 or Friday morning better?' — and lock it in before you leave.",
-        "Voss: use the either/or close to give them control while you get a yes. 'Would it be easier to connect Tuesday or Wednesday?' Never leave an open-ended 'I'll follow up.'"
+        "Every conversation needs to end with a committed action. Offer two specific times before you leave — 'Is Thursday at 2 or Friday morning better?' — and get a yes on the spot.",
+        "An open-ended 'I'll follow up' is not a next step. Call today, offer a specific time, and lock it in. No commitment means no deal."
       ],
       "Pitched": [
-        "Voss: silence after a pitch is an illusion of progress. Book a decision conversation — not a 'touch base.' Say: 'I want 20 minutes to walk through any remaining questions. Tuesday or Thursday?'",
-        "Carnegie: people commit to those they trust. Follow up with something of value first — a nearby win story or a relevant data point — before asking for the next step. Earn the meeting."
+        "Silence after a pitch is not progress. Book a decision conversation — not a check-in. 'I want 20 minutes to walk through any remaining questions — Tuesday or Thursday works for me.'",
+        "Lead with something of value first — a nearby win story or a relevant insight — then ask for the meeting. Earn the next conversation, then lock in the time."
       ],
       "Executive Alignment": [
-        "MEDDPICC red flag: no next step in EA means your champion isn't pulling internally. Ask them: 'What would help you make the case upstairs?' Give them the deck, the ROI numbers, or the talking points — and book a check-in.",
-        "Sinek: your champion needs to believe in the WHY before they'll sell it upward. Remind them of the original pain point and ask: 'Is that still a priority for your exec team?' Build the next step around their answer."
+        "A missing next step here means your champion isn't pulling internally. Ask them what they need to make the case upstairs — the deck, ROI numbers, talking points — provide it, and book a check-in.",
+        "Ask your champion directly: 'What does the exec need to see before committing?' Give them exactly that, then set a prep call before their next internal touchpoint."
       ],
       "Commercial Negotiation": [
-        "Carnegie: make the other person feel heard before you ask for anything. Re-anchor on shared goals — 'We both want this wrapped up by [date]. What needs to happen on your end this week?' — then lock in the step.",
-        "Iannarino: a deal with no next step in negotiation is drifting. Introduce a Mutual Action Plan — a shared checklist both sides own. Ask: 'What do you need from me to get this to the finish line?'"
+        "Introduce a Mutual Action Plan — a shared checklist with specific steps and owners on both sides. Ask: 'What do you need from me to get this to the finish line?' Build the plan around their answer.",
+        "Re-anchor on shared timing: 'We both want this wrapped up by [date]. What needs to happen on your end this week?' Get a specific commitment before ending any conversation."
       ],
       "Contract in Review": [
-        "Contracts drift without internal urgency. Ask your contact: 'What's the one thing I can do to help get this signed?' Do exactly that — then set a hard follow-up date.",
-        "Whyte (MEDDPICC): who owns the paper process on their side? Get a name and a timeline. Contracts need a quarterback on both sides — make sure you have one."
+        "Ask your contact: 'What's the one thing I can do right now to help get this signed?' Do that specific thing — then set a hard follow-up date.",
+        "Find out who owns the paper process on their side, get their name, and set a check-in directly. Contracts stall without someone pulling from the inside."
       ]
     };
     var t = tips[stage]; if (t) return pick(t);
-    return "Iannarino: there is no 'I'll follow up' — there is only a specific date, time, and mutual action item. Pick up the phone and set it now.";
+    return "There is no 'I'll follow up' — only a specific date, time, and mutual action item. Pick up the phone today and set it.";
   }
 
   if (riskLabel.indexOf("overdue") !== -1) {
     var tips = {
       "Pre-qualified": [
-        "Don't apologize for the gap — Voss says re-engage with curiosity, not guilt. 'I know things move fast — what's changed since we last connected?' Reset the step immediately on that call.",
-        "Carnegie: show genuine interest, not desperation. Re-open with something relevant to their business — a competitor win nearby, a new trend — before asking for anything."
+        "Re-engage with curiosity, not guilt. 'I know things move fast — what's changed since we last connected?' Reset the next step on that same call — don't let it stay open.",
+        "Lead with something relevant to their business before asking for anything. Re-earn the conversation, then nail down the next step."
       ],
       "Pitched": [
-        "Your pitch has gone cold. Rackham shows that lukewarm follow-ups fail — lead with a new Implication question instead. 'Has anything changed on your delivery costs since we spoke?' Re-earn the conversation.",
-        "Voss: use a label to re-engage. 'It seems like this slipped to the back of the list — completely understandable.' Then: 'What would make this the right time to revisit?'"
+        "Don't follow up asking for a decision — re-open with a question about their situation. 'Has anything changed on the delivery side since we spoke?' Re-earn the conversation before re-asking.",
+        "Re-engage honestly: 'It seems like this has slipped to the back of the list — completely fair.' Then: 'What would make this the right time to pick back up?' Let them set the terms."
       ],
       "Executive Alignment": [
-        "Voss's calibrated question: 'What's the biggest obstacle right now?' Non-threatening and open-ended, it surfaces the real issue. Don't re-pitch — diagnose first.",
-        "Sinek: reconnect to the WHY. Why did the exec engage originally? Remind your champion of that driver and ask if it's still relevant at the leadership level."
+        "The overdue step usually signals internal friction, not disinterest. Call your contact and ask directly: 'What's the biggest obstacle right now?' Diagnose before you re-pitch anything.",
+        "Reconnect with your champion on what's shifted internally. Ask: 'Is the original urgency still there at the leadership level?' Then reset a realistic next step around their answer."
       ],
       "Commercial Negotiation": [
-        "A stalled negotiation needs a reset. Iannarino: introduce urgency through consequence, not pressure. 'I want to flag that [pricing/terms] is tied to [date]. I'd hate for us to lose that.' Then book a call today.",
-        "Voss: 'How am I supposed to help move this forward if we can't connect this week?' Calibrated questions put the problem in their hands without accusation."
+        "A stalled negotiation needs a reset, not a follow-up. Flag that any pricing or promotional windows are time-sensitive, then ask: 'What would it take to get this moving again this week?'",
+        "Get back on a call and ask one direct question: 'What's standing between us and closing this?' Stop talking and let them answer. That answer is your action plan."
       ],
       "Contract in Review": [
-        "Ask your contact point-blank: 'On a scale of 1–10, how confident are you this gets signed this month?' Anything under 8 — ask what the 2 is. That answer is your next conversation.",
-        "Administrative delays usually mask real hesitation. Iannarino: get on a call, not an email chain. 'I want to make sure nothing is stuck on my end — can we do 15 minutes this week?'"
+        "Ask point-blank: 'On a scale of 1–10, how confident are you this gets signed this month?' Anything under 8 — ask what's causing the hesitation. That's the real conversation.",
+        "Administrative delays almost always mask a real objection. Get on a call — not an email chain. 'I want to make sure nothing is stuck on my end — can we do 15 minutes this week?'"
       ]
     };
     var t = tips[stage]; if (t) return pick(t);
-    return "Voss: silence is the enemy. Re-engage with a calibrated question — 'What's the biggest hurdle right now?' — then reset a hard next step on that same call.";
+    return "Re-engage with a direct question: 'What's the biggest hurdle right now?' Then reset a hard next step on that same call — don't leave without one.";
   }
 
   if (riskLabel.indexOf("d in stage") !== -1) {
     var tips = {
       "Pre-qualified": [
-        "At " + dis + " days, you need a forcing function. Rackham SPIN: you may not have surfaced a compelling Implication yet. Ask: 'What happens to your delivery revenue if you're off DoorDash while competitors aren't?' Then pitch or close-lost.",
-        "Sinek: your prospect hasn't connected to the WHY yet. Stop talking features. Ask: 'What was the original reason you took this meeting?' Build everything around their answer — or move on."
+        "At " + dis + " days, this needs a forcing function. Ask one impactful question: 'What happens to your delivery revenue if you stay off DoorDash while your competitors aren't?' Then move to pitch — or close-lost.",
+        "Have a direct conversation: 'I want to make sure I'm investing time where I can genuinely help — is this still something you're looking to move on?' Get a clear answer, then act on it."
       ],
       "Pitched": [
-        dis + " days post-pitch with no movement is a pipeline illusion. Voss: try the no-oriented question. 'Is it fair to say you've decided this isn't the right fit right now?' A 'no' reopens it — a 'yes' frees your pipeline.",
-        "Rackham: your Need-Payoff hasn't landed. Return with a quantified business case. Show them what staying off DoorDash costs per month in delivery revenue. Make the status quo expensive."
+        dis + " days without movement is a stall, not a maybe. Ask directly: 'Is it fair to say you've decided this isn't the right fit right now?' A clear no reopens the conversation — a yes frees your pipeline.",
+        "Go back with a quantified business case. Show them in real numbers what staying off DoorDash costs per month in delivery revenue. Make the cost of inaction concrete."
       ],
       "Executive Alignment": [
-        dis + " days in EA almost always means the Economic Buyer isn't engaged. Whyte MEDDPICC: do you have a champion with access to that buyer? If not, finding one is your only next step — not another follow-up.",
-        "Sinek: does the exec understand the WHY? Your champion may be selling features upward. Give them a business case framed around outcomes — revenue lift, competitive edge, cost reduction. Make it easy to sell internally."
+        "At " + dis + " days in EA, you likely don't have a true champion with exec access. Identify who inside the account can actually move this decision — and make engaging them your only next step.",
+        "Your champion may be selling features instead of outcomes. Give them a business case framed around revenue lift, competitive positioning, and cost — language that resonates at the executive level."
       ],
       "Commercial Negotiation": [
-        dis + " days in negotiation signals an unspoken objection. Voss: deploy an Accusation Audit. 'I imagine you're concerned about the commitment involved...' Name the thing they haven't said. It almost always unlocks the real conversation.",
-        "Iannarino: time is the enemy in negotiation. Build a Mutual Action Plan with a hard end date — show them what getting this done by [date] enables on their side. Give them a reason to move."
+        "A stall this long signals an unspoken objection. Name the concern you suspect: 'I imagine the timing of the commitment is the main hesitation here — am I reading that right?' Get it on the table.",
+        "Introduce a hard deadline tied to something real — a pricing window, promotional terms, or implementation timeline. Give them a concrete reason to move this week, not next month."
       ],
       "Contract in Review": [
-        dis + " days in contract review is a red flag. Iannarino: you need a coach on the inside. Ask your contact: 'Is there anything in the contract I can help address directly with your team?' Get a name and engage.",
-        "Whyte MEDDPICC: do you have the Paper Process mapped? Who owns legal on their side? Who needs to sign? If you can't answer these, that's the gap — get those answers this week."
+        "At " + dis + " days, you need an internal advocate pulling on the contract. Ask your contact: 'Is there anything in the agreement I can help address directly with your team?' Get in front of the friction.",
+        "Map out who owns legal on their side and who needs to sign. If you can't answer both questions, that's your immediate next step — contracts don't close without a clear paper process."
       ]
     };
     var t = tips[stage]; if (t) return pick(t);
-    return "At " + dis + " days in " + stage + ", this deal needs a forcing function. Confirm: do you have an Economic Buyer, a clear business case, and a mutual close plan? If not, those are your next three conversations.";
+    return "At " + dis + " days in " + stage + ", this deal needs a decision. Confirm you have an identified decision-maker, a clear business case, and a mutual close plan — if not, those are your next three conversations.";
   }
 
   if (riskLabel === "Close date passed") {
     var tips = {
       "Pre-qualified": [
-        "MEDDPICC: is there real pain, real budget, and a real decision-maker? If yes — reset the timeline with their explicit commitment. If no — mark close-lost and protect your pipeline accuracy.",
-        "Carnegie: have a direct conversation. 'I want to make sure I'm spending time where I can genuinely help. Is this still moving forward?' Give them the chance to recommit — or release the deal."
+        "Have a direct conversation: 'I want to make sure I'm investing time where I can genuinely help — is this still moving forward?' Give them the chance to recommit with a real timeline, or release it.",
+        "Is there real pain, a real decision-maker, and real urgency? If yes, reset the timeline with their explicit commitment. If any of those are missing, mark it close-lost."
       ],
       "Pitched": [
-        "Slipped close date post-pitch means urgency was never established. Sinek: reconnect to their WHY. 'When we first spoke, you mentioned [pain]. Is that still pressing?' Re-anchor on the problem, not the product.",
-        "Rackham: your Need-Payoff wasn't strong enough. Go back with numbers. Show them what staying off DoorDash costs per month. Make delay the expensive option."
+        "A slipped close date after the pitch means urgency was never truly established. Go back to the original pain: 'When we first spoke, you mentioned [problem]. Is that still pressing?' Reconnect to their problem, not your product.",
+        "Make the cost of delay concrete. Show them what another month off DoorDash means in missed delivery revenue and competitor share. Make waiting the expensive option."
       ],
       "Executive Alignment": [
-        "A passed close date in EA is a champion problem. Whyte: coach your champion explicitly — give them a one-page exec-ready business case and book a prep call before their next internal meeting.",
-        "Voss: label it. 'It seems like getting this on the exec's calendar has been harder than expected.' Then: 'What would make it easier for you to bring this forward?' Let them tell you the path."
+        "A slipped date here is a champion problem — they can't get exec commitment. Coach them explicitly: give them an exec-ready business case and book a prep call before their next internal touchpoint.",
+        "Name what you're observing: 'It seems like getting this on the exec's calendar has been harder than expected.' Then ask: 'What would make it easier to bring this forward?' Let them tell you the path."
       ],
       "Commercial Negotiation": [
-        "They're waiting on something — a competitor, a budget cycle, internal approval. Voss calibrated question: 'What needs to happen on your end for this to get done this week?' Then stop talking.",
-        "Iannarino: introduce consequence without pressure. Flag that promotional terms or pricing are tied to the original date. 'If we miss this window, what does the timeline look like from your side?'"
+        "Ask the one question that cuts through everything: 'What needs to happen on your end for this to get done this week?' Then stop talking. Their answer tells you exactly what's really going on.",
+        "Flag the consequence of missing the window — pricing terms, promotional period, implementation timeline. Make the delay cost something real, not just a date change."
       ],
       "Contract in Review": [
-        "Legal delays almost always signal executive hesitation. Ask your champion directly: 'Between us, is there anything beyond the contract language causing hesitation?' Address the real issue — not the legal one.",
-        "Whyte: who owns the signature? If it's not your day-to-day contact, you don't have a path to close. Get a name, get a meeting, and accelerate the paper process directly."
+        "Legal delays almost always mean there's hesitation above the contract level. Ask your champion directly: 'Between us, is there anything beyond the paperwork causing hesitation?' Address the real issue.",
+        "Find out who owns the signature. If it's not your day-to-day contact, you're missing a direct path to close. Get a name and get in front of that person."
       ]
     };
     var t = tips[stage]; if (t) return pick(t);
-    return "Iannarino: 'A slipped date isn't a delay — it's a signal.' Ask directly: 'What would need to be true for this to move forward this month?' Then build a mutual action plan around their answer.";
+    return "Ask directly: 'What would need to be true for this to move forward this month?' Build a new mutual action plan around their answer — with specific steps, dates, and owners on both sides.";
   }
 
   if (riskLabel === "Active deal blocker logged") {
     var tips = {
       "Pre-qualified": [
-        "Blockers at pre-qual are often unspoken concerns, not hard stops. Carnegie: understand before you solve. Ask: 'Help me understand what's making this difficult from your side.' Listen twice as long as you talk.",
-        "Rackham SPIN: a blocker is an Implication waiting to be exposed. Ask: 'If this stays unresolved, what does that mean for [their delivery goal or revenue]?' Make the cost of the blocker more painful than solving it."
+        "Blockers at this stage are usually unspoken concerns, not hard stops. Ask: 'Help me understand what's making this difficult from your side.' Listen without jumping to solve — understanding the real concern is the whole job here.",
+        "Ask: 'If the blocker weren't an issue, would this be moving forward?' If yes, you have a solvable problem. If no, there's a deeper objection underneath — surface it before trying to fix the stated one."
       ],
       "Pitched": [
-        "A blocker post-pitch is almost always about risk. Voss: label it first. 'It seems like [blocker] is the real concern here.' Once labeled, ask: 'What would need to be true for you to feel comfortable moving forward?' Let them define the path.",
-        "Iannarino: blockers reveal what they care about most. Don't solve the stated issue first — ask: 'If we could resolve [blocker] tomorrow, would this be a yes?' If not, there's a deeper objection to surface."
+        "Name the blocker directly: 'It seems like [blocker] is the real concern here — am I reading that right?' Once it's on the table, ask: 'What would need to be true for you to feel comfortable moving forward?' Let them define the solution.",
+        "Don't solve the stated blocker first. Ask: 'If we could resolve this tomorrow, would this be a yes?' If not, there's a deeper issue. Surface everything before solving anything."
       ],
       "Executive Alignment": [
-        "Blockers in EA are usually political. MEDDPICC: who benefits from this deal NOT moving? Understanding the internal dynamics is step one. Then coach your champion on how to neutralize the opposition.",
-        "Voss: 'How are we supposed to move this forward without fully understanding what's in the way?' Calibrated questions surface the political reality without accusation. Get your champion to map the internal stakeholders."
+        "Blockers at this stage are usually political, not practical. Figure out who benefits from this deal not moving — then coach your champion on how to address that internal resistance directly.",
+        "Ask your champion to map the key stakeholders. Who is skeptical? Who is neutral? Who is a potential ally? That map tells you where to focus your energy."
       ],
       "Commercial Negotiation": [
-        "In negotiation, blockers are leverage signals. Voss: don't solve immediately. First, Accusation Audit — name every concern they might have. Then offer a creative trade, not a discount.",
-        "Iannarino: a blocker in commercial negotiation is often a buying signal in disguise. Clear the deck — 'Outside of [blocker], is there anything else that would prevent us from moving forward?' Then solve only what remains."
+        "In negotiation, a blocker is often a buying signal — they wouldn't raise it if they weren't interested. Ask: 'Outside of this, is there anything else that would prevent us from moving forward?' Clear the full deck before solving the first thing.",
+        "Name every concern you suspect they might have before they do. This shows you understand their position and builds the trust needed to find a real solution — not just a discount."
       ],
       "Contract in Review": [
-        "Legal blockers mask real objections. Ask: 'If we resolved [blocker] today, is there anything else that would prevent signing?' Surface everything before solving the first thing — or you'll play whack-a-mole.",
-        "Whyte: who on their legal or procurement team is creating the friction? Get a direct line to that person and address it deal-to-deal rather than through your contact."
+        "Ask before you solve: 'If we resolved this today, is there anything else that would prevent signing?' Surface all remaining concerns first — otherwise you'll keep finding new ones after each fix.",
+        "Find out who on their legal or procurement team is creating the friction and get a direct line to them. Blockers at this stage need to be addressed deal-to-deal, not filtered through your day-to-day contact."
       ]
     };
     var t = tips[stage]; if (t) return pick(t);
-    return "Voss: label the blocker out loud. 'It seems like [blocker] is the main thing between us and moving forward.' This defuses resistance and opens the real conversation. Then problem-solve together.";
+    return "Name the blocker out loud with your contact: 'It seems like this is the main thing standing between us right now.' Once it's on the table, ask what would need to happen to resolve it — and make sure there aren't more behind it.";
   }
 
-  return "Build a Mutual Action Plan with specific steps, dates, and owners on both sides. Iannarino: the reps who win are the ones who make it easy for the buyer to say yes at every step.";
+  return "Build a Mutual Action Plan — specific steps, specific dates, specific owners on both sides. The reps who close fastest are the ones who make it easy for the buyer to say yes at every step.";
 }
 
 function renderCoachingView() {
