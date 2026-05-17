@@ -317,7 +317,35 @@ const RAW_DATA = [{"id": "d0001", "rep": "Ali LaRaia", "account": "Sunset Kitche
 const ALL_REPS = ["Ali LaRaia", "Amy Phung", "Anna Navarro", "Brandon Rothberg", "Brett Bartholomew", "Cam McRae", "Cameron Holmes", "Casey Atamaniuk", "Chris Battaglia", "Christian Montoya", "Christian Ortega", "Christopher Agard", "Cody Goetze", "Cole Wallace", "David Carnevale", "Dillan Agostinelli", "Doyle Cowart", "Drew Barrett", "Elliott Bogdan", "Emmett Turner-Jackson", "Erin Caramanico", "Franz Luigi De Guzman", "Genesis Rodriguez", "Gregory Spears", "Henry Behar", "Ivory Melone", "Jaison Williams", "Jakub Drozd", "Jared Burri", "Jeremiah Tolbert", "Jessica Cardenas", "Jessica Henkel", "John Williams", "Justin Caballero", "Kathryn Shelman", "Kevin Paz", "Kheder Hassoun", "Kiaya Jay Williams", "Klair Davis", "Luis Carrillo Navarro", "Luka Liska", "Marie Douceur", "Marissa Rinderman", "Mark Buckley", "Mason Shank", "Melissa Joubert", "Michael Brook", "Miguel Amaro", "Mike Dove", "Mina Hines", "Nic Syzdek", "Nicole Cotton", "Peter Carroll", "Qendrim Shala", "Raefe Waltman", "Rob Crossley", "Robert Mailey", "Ross Heuer", "Ruben Matatov", "Ryan Leung", "Scott Cannon", "Shannon Fricke", "Sharroni Lewis-Keith", "Sindri Raguseo", "Sydney Comeaux", "Tarah Drouin", "Taylor Scoma", "Will Taylor", "Yasmine Nazzal", "Zachary Steinfeld"];
 
 const TODAY = new Date("2026-05-15");
-const STAGES = ["Pre-qualified","Pitched","Executive Alignment","Commercial Negotiation","Contract in Review"];
+
+const COACHING_STATUS = {
+  "Marissa Rinderman":     {type:"loa",       label:"LOA · Coaching Plan Paused"},
+  "Peter Carroll":         {type:"pip",       label:"PIP through 6/5"},
+  "Tarah Drouin":          {type:"coaching",  label:"Extended Coaching Plan"},
+  "Drew Barrett":          {type:"pip_draft", label:"Drafting PIP/Package"},
+  "Luis Carrillo Navarro": {type:"pip_draft", label:"Drafting PIP/Package"},
+  "John Williams":         {type:"pip",       label:"PIP through 6/10"},
+  "Kevin Paz":             {type:"coaching",  label:"Coaching Plan thru 5/20"},
+  "Nicole Cotton":         {type:"coaching",  label:"Coaching Plan thru 5/20"},
+  "Melissa Joubert":       {type:"coaching",  label:"Coaching Plan thru 6/4"},
+  "Sharroni Lewis-Keith":  {type:"coaching",  label:"Coaching Plan thru 6/4"},
+  "Sindri Raguseo":        {type:"coaching",  label:"Coaching Plan thru 6/5"},
+  "Robert Mailey":         {type:"coaching",  label:"Coaching Plan thru 6/4"}
+};
+
+function statusBadge(rep) {
+  var s = COACHING_STATUS[rep];
+  if (!s) return "";
+  var style = {
+    pip:       "background:#fff0f0;color:#c53030;border:1px solid #fc8181",
+    pip_draft: "background:#fff4ec;color:#9c4221;border:1px solid #f6ad55",
+    coaching:  "background:#fffdf0;color:#b7791f;border:1px solid #f6e05e",
+    loa:       "background:#f5f0ff;color:#6b46c1;border:1px solid #b794f4"
+  }[s.type] || "";
+  return '<div style="'+style+';border-radius:4px;font-size:9px;font-weight:700;padding:1px 6px;margin-top:2px;white-space:nowrap;display:inline-block">'+esc(s.label)+'</div>';
+}
+
+const STAGES =["Pre-qualified","Pitched","Executive Alignment","Commercial Negotiation","Contract in Review"];
 const STAGE_COLORS = {
   "Pre-qualified":"#4299e1",
   "Pitched":"#276749",
@@ -640,7 +668,7 @@ function renderOverview() {
     const hcolor = healthColor(health);
 
     tableHtml += '<tr class="rep-row" onclick="selectRep(\'' + esc(rep) + '\')">';
-    tableHtml += '<td><div class="rep-cell"><div class="avatar">'+initials+'</div><div><div class="rep-name">'+esc(rep)+'</div><div class="region-tag">'+esc(regionLabel)+'</div></div></div></td>';
+    tableHtml += '<td><div class="rep-cell"><div class="avatar">'+initials+'</div><div><div class="rep-name">'+esc(rep)+'</div><div class="region-tag">'+esc(regionLabel)+'</div>'+statusBadge(rep)+'</div></div></td>';
     const repLevel = LEVEL_MAP[rep] || '';
     const repManager = MANAGER_MAP[rep] || '';
     tableHtml += '<td style="font-size:12px;font-weight:600;color:#4a5568;text-align:center;white-space:nowrap"><span style="padding:2px 7px;border-radius:10px;background:#edf0f5">'+esc(repLevel)+'</span></td>';
@@ -806,7 +834,7 @@ function renderRiskView() {
       html += '<div class="risk-rep-block">';
       html += '<div class="risk-rep-header">';
       html += '<div class="avatar">' + initials + '</div>';
-      html += '<div><div class="risk-rep-name">' + esc(rep) + '</div>';
+      html += '<div><div class="risk-rep-name">' + esc(rep) + '</div>' + statusBadge(rep);
       if (mgr) html += '<div style="font-size:10px;color:#718096">' + esc(mgr) + '</div>';
       html += '</div>';
       html += '<div class="risk-rep-meta">';
@@ -907,7 +935,7 @@ function renderManagerView() {
 
         html += '<tr class="rep-row" onclick="selectRep(\'' + esc(rep) + '\')">';
         html += '<td><div class="rep-cell"><div class="avatar">' + initR + '</div>';
-        html += '<div><div class="rep-name">' + esc(rep) + '</div>';
+        html += '<div><div class="rep-name">' + esc(rep) + '</div>' + statusBadge(rep);
         if (lvl) html += '<div style="font-size:10px;color:#718096">' + esc(lvl) + '</div>';
         html += '</div></div></td>';
         STAGES.forEach(stage => {
@@ -949,7 +977,7 @@ function renderDetailView() {
   html += '<div class="detail-header">';
   html += '<button class="back-btn" onclick="goBack()">&#8592; Back</button>';
   html += '<div class="detail-rep-info"><div class="avatar-lg">'+initials+'</div>';
-  html += '<div><div class="detail-rep-name">'+esc(rep)+'</div>';
+  html += '<div><div class="detail-rep-name">'+esc(rep)+'</div>'+statusBadge(rep);
   html += '<div class="detail-rep-sub">'+data.length+' deals &middot; '+esc(regionLabel)+'</div></div></div>';
   html += '</div>';
 
@@ -1250,7 +1278,7 @@ function renderCoachingView() {
     html += '<div class="coach-header">';
     html += '<div style="display:flex;align-items:center;gap:10px">';
     html += '<div class="avatar">'+initials+'</div>';
-    html += '<div><div class="coach-rep-name">'+esc(rep)+'</div>';
+    html += '<div><div class="coach-rep-name">'+esc(rep)+'</div>'+statusBadge(rep);
     html += '<div class="coach-rep-sub"><span>'+esc(regionLabel)+'</span>';
     html += '<span class="coach-health" style="color:'+hcolor+'">'+health+'%</span></div></div></div></div>';
     html += '<div class="coach-body">';
