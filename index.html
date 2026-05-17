@@ -794,7 +794,47 @@ function renderOverview() {
 
   timingHtml += '</div></div></div>';
 
-  document.getElementById("overviewView").innerHTML = timingHtml + '<div style="display:flex;gap:16px;padding:0 0 24px;flex-wrap:wrap;width:100%">' + funnelHtml + tableHtml + '</div>';
+  // ── Stage conversion rate strip ──────────────────────────────────
+  // Waterfall: for stage N, conversion = deals at N+1 or beyond / deals at N or beyond
+  const cumulFrom = {};
+  let _running = 0;
+  for (let i = STAGES.length - 1; i >= 0; i--) {
+    _running += stageCounts[STAGES[i]];
+    cumulFrom[STAGES[i]] = _running;
+  }
+
+  let convHtml = '<div style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:14px 20px;margin-bottom:16px;width:100%;box-sizing:border-box">';
+  convHtml += '<div style="font-size:11px;font-weight:700;color:#4a5568;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Stage Conversion Rates</div>';
+  convHtml += '<div style="display:flex;align-items:center;flex-wrap:nowrap;overflow-x:auto">';
+
+  STAGES.forEach((stage, i) => {
+    const count = stageCounts[stage];
+    const color = STAGE_COLORS[stage];
+    const short = STAGE_SHORT[stage];
+
+    convHtml += '<div style="text-align:center;min-width:90px;flex-shrink:0">';
+    convHtml += '<div style="font-size:10px;font-weight:700;color:#fff;background:' + color + ';border-radius:6px;padding:6px 10px;white-space:nowrap">' + esc(short) + '</div>';
+    convHtml += '<div style="font-size:18px;font-weight:800;color:#2d3748;margin:4px 0 1px">' + count + '</div>';
+    convHtml += '<div style="font-size:10px;color:#a0aec0">deals</div>';
+    convHtml += '</div>';
+
+    if (i < STAGES.length - 1) {
+      const atThis    = cumulFrom[stage]          || 1;
+      const atNext    = cumulFrom[STAGES[i + 1]]  || 0;
+      const convRate  = Math.round((atNext / atThis) * 100);
+      const convColor = convRate >= 60 ? '#38a169' : convRate >= 35 ? '#d69e2e' : '#e53e3e';
+      const convBg    = convRate >= 60 ? '#f0fff4' : convRate >= 35 ? '#fffff0' : '#fff5f5';
+
+      convHtml += '<div style="display:flex;flex-direction:column;align-items:center;padding:0 8px;flex-shrink:0;min-width:64px">';
+      convHtml += '<div style="font-size:12px;font-weight:800;color:' + convColor + ';background:' + convBg + ';border:1.5px solid ' + convColor + ';border-radius:12px;padding:3px 9px;white-space:nowrap">' + convRate + '%</div>';
+      convHtml += '<div style="font-size:18px;color:#cbd5e0;margin-top:2px;line-height:1">&rarr;</div>';
+      convHtml += '</div>';
+    }
+  });
+
+  convHtml += '</div></div>';
+
+  document.getElementById("overviewView").innerHTML = timingHtml + convHtml + '<div style="display:flex;gap:16px;padding:0 0 24px;flex-wrap:wrap;width:100%">' + funnelHtml + tableHtml + '</div>';
 }
 
 function openDealModal(dealId) {
