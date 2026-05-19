@@ -1176,14 +1176,18 @@ function renderDetailView() {
     html += '<div style="font-size:10px;font-weight:600;color:#718096;margin-bottom:6px">Active Pipeline Breakdown</div>';
     stageLabels.forEach(function(sl) {
       var cnt = pd.activeStages[sl[0]] || 0;
-      if (!cnt) return;
-      var barW = Math.round(cnt / maxStage * 100);
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+      var barW = cnt ? Math.round(cnt / maxStage * 100) : 0;
+      var convPct = fwdConvPct(pd, sl[0]);
+      var tipText = sl[1] + ': ' + cnt + ' deal' + (cnt !== 1 ? 's' : '') +
+        (convPct !== null ? ' &bull; Est. &rarr; CW: <b>' + convPct + '%</b>' : '');
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px" onmouseenter="showAeTip(event,\''+tipText+'\')" onmouseleave="hideAeTip()" onmousemove="moveAeTip(event)">';
       html += '<div style="width:62px;font-size:10px;color:#4a5568;text-align:right;flex-shrink:0">'+sl[1]+'</div>';
       html += '<div style="flex:1;background:#edf2f7;border-radius:4px;height:14px;overflow:hidden">';
-      html += '<div style="width:'+barW+'%;background:'+sl[2]+';height:100%;border-radius:4px;transition:width .3s"></div>';
+      if (barW) {
+        html += '<div style="width:'+barW+'%;background:'+sl[2]+';height:100%;border-radius:4px;transition:width .3s"></div>';
+      }
       html += '</div>';
-      html += '<div style="font-size:10px;font-weight:700;color:#2d3748;width:18px;text-align:right">'+cnt+'</div>';
+      html += '<div style="font-size:10px;font-weight:700;color:'+(cnt?'#2d3748':'#cbd5e0')+';width:18px;text-align:right">'+cnt+'</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -1868,6 +1872,43 @@ function esc(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+function fwdConvPct(pd, stageKey) {
+  var cw = pd.cwOpps || 0;
+  var s = pd.activeStages || {};
+  var denom;
+  if (stageKey === 'preq') {
+    denom = (pd.totalOpps || 0);
+  } else if (stageKey === 'pitched') {
+    denom = (s.pitched||0)+(s.exec||0)+(s.commneg||0)+(s.contract||0)+cw;
+  } else if (stageKey === 'exec') {
+    denom = (s.exec||0)+(s.commneg||0)+(s.contract||0)+cw;
+  } else if (stageKey === 'commneg') {
+    denom = (s.commneg||0)+(s.contract||0)+cw;
+  } else if (stageKey === 'contract') {
+    denom = (s.contract||0)+cw;
+  } else {
+    return null;
+  }
+  if (!denom) return null;
+  return Math.round(cw / denom * 100);
+}
+
+function showAeTip(evt, text) {
+  var tip = document.getElementById('ae-tip');
+  tip.innerHTML = text;
+  tip.style.display = 'block';
+  tip.style.left = (evt.clientX + 14) + 'px';
+  tip.style.top = (evt.clientY - 10) + 'px';
+}
+function hideAeTip() {
+  document.getElementById('ae-tip').style.display = 'none';
+}
+function moveAeTip(evt) {
+  var tip = document.getElementById('ae-tip');
+  tip.style.left = (evt.clientX + 14) + 'px';
+  tip.style.top = (evt.clientY - 10) + 'px';
+}
+
 // ============================================================
 // START
 // ============================================================
@@ -1877,5 +1918,6 @@ try {
   document.body.innerHTML += '<div style="position:fixed;top:0;left:0;right:0;background:#e53e3e;color:white;padding:20px;font-family:monospace;font-size:14px;z-index:9999"><strong>JS Error:</strong> ' + err.message + '<br><pre>' + err.stack + '</pre></div>';
 }
 </script>
+<div id="ae-tip" style="position:fixed;background:#2d3748;color:#fff;font-size:11px;font-weight:600;padding:7px 11px;border-radius:7px;pointer-events:none;display:none;z-index:9999;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.35);line-height:1.5"></div>
 </body>
 </html>
