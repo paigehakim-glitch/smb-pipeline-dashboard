@@ -1173,6 +1173,20 @@ function renderDetailView() {
     // Pipeline stage funnel bars
     var stageLabels = [['preq','Pre-Qual','#9ae6b4'],['pitched','Pitched','#90cdf4'],['exec','Exec Align','#d6bcfa'],['commneg','Comm Neg','#fbd38d'],['contract','Contract','#fc8181']];
     var maxStage = Math.max.apply(null, stageLabels.map(function(sl){return pd.activeStages[sl[0]]||0;})) || 1;
+    // Stage conversion rate chips row
+    html += '<div style="margin-bottom:10px">';
+    html += '<div style="font-size:10px;font-weight:600;color:#718096;margin-bottom:6px">Stage → CW Conversion (Est.)</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    stageLabels.forEach(function(sl) {
+      var convPct = fwdConvPct(pd, sl[0]);
+      var pctStr = convPct !== null ? convPct + '%' : '—';
+      html += '<div style="display:flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:5px 10px;min-width:56px">';
+      html += '<div style="font-size:14px;font-weight:800;color:#2d3748">'+pctStr+'</div>';
+      html += '<div style="font-size:9px;font-weight:600;color:#718096;margin-top:1px;white-space:nowrap">'+sl[1]+'</div>';
+      html += '<div style="width:20px;height:3px;background:'+sl[2]+';border-radius:2px;margin-top:3px"></div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
     html += '<div style="font-size:10px;font-weight:600;color:#718096;margin-bottom:6px">Active Pipeline Breakdown</div>';
     stageLabels.forEach(function(sl) {
       var cnt = pd.activeStages[sl[0]] || 0;
