@@ -1064,6 +1064,85 @@ function renderManagerView() {
       html += '</div></div>';
 
       // Rep rows table
+      // ── Coaching Themes ──────────────────────────────────────
+      (function() {
+        var n = mgrDeals.length;
+        if (!n) return;
+        var themes = [];
+        var tday = new Date(); tday.setHours(0,0,0,0);
+        var mEnd = new Date(tday.getFullYear(), tday.getMonth()+1, 0);
+
+        // No next step
+        var noNS = mgrDeals.filter(function(d){ return !d.nextStep || !d.nextStep.trim(); });
+        var noNSPct = Math.round(noNS.length / n * 100);
+        if (noNSPct >= 20) themes.push({sev:'high', head: noNSPct+'% of deals have no next step ('+noNS.length+' deals)', body:'Reps are opening opps without a defined follow-through action — high slip risk.'});
+
+        // Overdue next steps
+        var ov = mgrDeals.filter(function(d){ if(!d.nextStepDate) return false; var x=new Date(d.nextStepDate); return !isNaN(x) && (tday-x)/86400000 > 3; });
+        var ovPct = Math.round(ov.length / n * 100);
+        if (ovPct >= 15) themes.push({sev:'high', head: ov.length+' deals with overdue next steps ('+ovPct+'%)', body:'Follow-through is breaking down — reps are not completing or updating their planned actions.'});
+
+        // Pre-Qual concentration
+        var pqCnt = mgrDeals.filter(function(d){ return d.stage==='Pre-qualified'; }).length;
+        var pqPct = Math.round(pqCnt / n * 100);
+        if (pqPct >= 50) themes.push({sev: pqPct>=65?'high':'med', head: pqPct+'% of pipeline in Pre-Qual ('+pqCnt+' deals)', body:'Top-heavy pipeline — reps are sourcing but not advancing deals. Focus 1:1s on progression blockers.'});
+
+        // Activity staleness
+        var stale = mgrDeals.filter(function(d){ return (parseInt(d.daysSinceActivity)||0) > 14; });
+        var stalePct = Math.round(stale.length / n * 100);
+        if (stalePct >= 20) themes.push({sev: stalePct>=40?'high':'med', head: stale.length+' deals with no activity in 14+ days ('+stalePct+'%)', body:'Large portion of pipeline has gone dark — risk of silent deal loss without intervention.'});
+
+        // Blockers
+        var blk = mgrDeals.filter(function(d){ return d.blockers && d.blockers.trim(); });
+        if (blk.length >= 3) themes.push({sev: blk.length>=6?'high':'med', head: blk.length+' deals with active blockers logged', body:'Manager escalation needed — reps have flagged these deals as stuck and need help removing barriers.'});
+
+        // Rep health spread
+        var rhs = mgrReps.map(function(r){ var rd=mgrDeals.filter(function(d){return d.rep===r;}); return {r:r, h:repHealthScore(rd)}; }).filter(function(x){return x.h>0;});
+        rhs.sort(function(a,b){return a.h-b.h;});
+        if (rhs.length >= 2) {
+          var lo = rhs[0], hi = rhs[rhs.length-1];
+          var lowReps = rhs.filter(function(x){return x.h<45;});
+          if (lowReps.length >= 1 && (hi.h - lo.h) >= 35) {
+            themes.push({sev: lowReps.length>=3?'high':'med', head: 'Wide health gap: '+lo.r.split(' ').slice(-1)[0]+' '+lo.h+'% — '+hi.r.split(' ').slice(-1)[0]+' '+hi.h+'%', body: lowReps.length+' rep'+(lowReps.length>1?'s':'')+' ('+lowReps.map(function(x){return x.r.split(' ')[0];}).join(', ')+') below 45% — uneven execution quality across the team.'});
+          }
+        }
+
+        // Late-stage pipeline (positive)
+        var late = mgrDeals.filter(function(d){ return d.stage==='Commercial Negotiation'||d.stage==='Contract in Review'; });
+        if (late.length >= 2) themes.push({sev:'pos', head: late.length+' deals in Comm Neg or Contract in Review', body:'Real close potential — prioritize manager coverage on these to protect in-period attainment.'});
+
+        // Closing this month
+        var closeMo = mgrDeals.filter(function(d){ if(!d.closeDate) return false; var cd=new Date(d.closeDate+'T00:00:00'); return cd>=tday && cd<=mEnd; });
+        var lsClosing = closeMo.filter(function(d){ return d.stage==='Executive Alignment'||d.stage==='Commercial Negotiation'||d.stage==='Contract in Review'; });
+        if (closeMo.length >= 2) themes.push({sev:'pos', head: closeMo.length+' deals scheduled to close this month', body: lsClosing.length+' in late stage — direct manager coaching on these protects in-month number.'});
+
+        // Sort and cap
+        var so = {high:0, med:1, pos:2};
+        themes.sort(function(a,b){return so[a.sev]-so[b.sev];});
+        themes = themes.slice(0, 4);
+
+        if (!themes.length) return;
+
+        var sevStyle = {
+          high: 'border-left:3px solid #e53e3e;background:#fff5f5',
+          med:  'border-left:3px solid #d69e2e;background:#fffff0',
+          pos:  'border-left:3px solid #38a169;background:#f0fff4'
+        };
+        var sevLabel = {high:'#c53030', med:'#b7791f', pos:'#276749'};
+
+        html += '<div style="padding:10px 14px 4px 14px">';
+        html += '<div style="font-size:10px;font-weight:700;color:#4a5568;letter-spacing:.5px;margin-bottom:8px">COACHING THEMES</div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">';
+        themes.forEach(function(t) {
+          html += '<div style="'+sevStyle[t.sev]+';border-radius:7px;padding:8px 10px">';
+          html += '<div style="font-size:10px;font-weight:700;color:'+sevLabel[t.sev]+';margin-bottom:3px">'+esc(t.head)+'</div>';
+          html += '<div style="font-size:10px;color:#4a5568;line-height:1.4">'+esc(t.body)+'</div>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      })();
+      // ── End Coaching Themes ───────────────────────────────────
+
       html += '<div class="mgr-body"><table>';
       html += '<tr><th>REP</th>';
       STAGES.forEach(s => html += '<th style="text-align:center">' + STAGE_SHORT[s] + '</th>');
