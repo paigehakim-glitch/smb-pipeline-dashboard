@@ -1463,7 +1463,10 @@ function renderDealCard(deal) {
   // Review note
   html += '<div class="review-box">';
   html += '<div class="review-label">Review Note</div>';
-  html += '<textarea class="review-textarea" rows="2" id="review-'+esc(deal.id)+'" onchange="saveReview(\'' + esc(deal.id) + '\',this.value)" placeholder="Add coaching note..."></textarea>';
+  html += '<textarea class="review-textarea" rows="3" id="review-'+esc(deal.id)+'" placeholder="Add coaching note..."></textarea>';
+  html += '<div style="display:flex;justify-content:flex-end;margin-top:5px">';
+  html += '<button id="save-btn-'+esc(deal.id)+'" onclick="saveReview(\''+esc(deal.id)+'\',document.getElementById(\'review-'+esc(deal.id)+'\').value)" style="font-size:11px;font-weight:600;color:#fff;background:#4299e1;border:none;border-radius:5px;padding:4px 14px;cursor:pointer">Save</button>';
+  html += '</div>';
   html += '</div>';
 
   html += '</div></div>';
@@ -2035,6 +2038,12 @@ function filterByStage(stage) {
 
 function saveReview(dealId, value) {
   localStorage.setItem("smb_review_"+dealId, value);
+  var btn = document.getElementById("save-btn-"+dealId);
+  if (btn) {
+    btn.textContent = "Saved ✓";
+    btn.style.background = "#38a169";
+    setTimeout(function() { btn.textContent = "Save"; btn.style.background = "#4299e1"; }, 1800);
+  }
 }
 
 function esc(s) {
