@@ -1205,6 +1205,66 @@ function renderDetailView() {
       html += '</div>';
     });
     html += '</div>';
+
+    // Forecast section
+    var stageKeyMap = {'Pre-qualified':'preq','Pitched':'pitched','Executive Alignment':'exec','Commercial Negotiation':'commneg','Contract in Review':'contract'};
+    var today = new Date(); today.setHours(0,0,0,0);
+    var dow = today.getDay();
+    var weekEnd = new Date(today); weekEnd.setDate(today.getDate() + (5 - dow < 0 ? 7 + 5 - dow : 5 - dow));
+    var monthEnd = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    var weekDeals = [], monthDeals = [];
+    data.forEach(function(d) {
+      if (!d.closeDate) return;
+      var cd = new Date(d.closeDate + 'T00:00:00');
+      if (cd < today) return;
+      var sk = stageKeyMap[d.stage];
+      var prob = sk ? (fwdConvPct(pd, sk) || 0) : 0;
+      var entry = {account: d.account, stage: d.stage, closeDate: d.closeDate, prob: prob, amount: d.amount || 0};
+      if (cd <= weekEnd) weekDeals.push(entry);
+      else if (cd <= monthEnd) monthDeals.push(entry);
+    });
+    weekDeals.sort(function(a,b){return a.closeDate.localeCompare(b.closeDate);});
+    monthDeals.sort(function(a,b){return a.closeDate.localeCompare(b.closeDate);});
+
+    function fcastExpected(deals) {
+      return deals.reduce(function(s,d){return s + d.prob/100;}, 0);
+    }
+    function fcastRow(d) {
+      var probColor = d.prob >= 70 ? '#276749' : d.prob >= 40 ? '#b7791f' : '#718096';
+      var stageColor = STAGE_COLORS[d.stage] || '#718096';
+      var mm = d.closeDate.slice(5,7), dd = d.closeDate.slice(8,10);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8">' +
+        '<div style="width:6px;height:6px;border-radius:50%;background:'+stageColor+';flex-shrink:0"></div>' +
+        '<div style="flex:1;font-size:10px;color:#2d3748;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.account.replace(' (Ultimate Parent)','').replace(' (Ultimate parent)',''))+'</div>' +
+        '<div style="font-size:9px;color:#718096;flex-shrink:0">'+mm+'/'+dd+'</div>' +
+        '<div style="font-size:10px;font-weight:700;color:'+probColor+';flex-shrink:0;min-width:30px;text-align:right">'+d.prob+'%</div>' +
+        '</div>';
+    }
+    function fcastBox(label, deals, bgColor) {
+      var exp = fcastExpected(deals);
+      var expStr = exp > 0 ? (exp < 1 ? '<1' : Math.round(exp).toString()) : '0';
+      var out = '<div style="flex:1;background:'+bgColor+';border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px">';
+      out += '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">';
+      out += '<div style="font-size:10px;font-weight:700;color:#4a5568">'+label+'</div>';
+      out += '<div style="font-size:9px;color:#718096">'+deals.length+' deal'+(deals.length!==1?'s':'')+' &bull; ~<b style="color:#2d3748">'+expStr+'</b> likely</div>';
+      out += '</div>';
+      if (deals.length === 0) {
+        out += '<div style="font-size:10px;color:#a0aec0;text-align:center;padding:8px 0">No deals scheduled</div>';
+      } else {
+        deals.forEach(function(d){ out += fcastRow(d); });
+      }
+      out += '</div>';
+      return out;
+    }
+
+    html += '<div style="margin-top:4px;margin-bottom:10px">';
+    html += '<div style="font-size:10px;font-weight:600;color:#718096;margin-bottom:7px">Close Date Forecast</div>';
+    html += '<div style="display:flex;gap:8px">';
+    html += fcastBox('This Week', weekDeals, '#fffff5');
+    html += fcastBox('This Month', monthDeals, '#f7fafc');
+    html += '</div>';
+    html += '<div style="font-size:9px;color:#a0aec0;margin-top:5px">% = est. stage → CW conversion &bull; deals past close date excluded</div>';
+    html += '</div>';
   }
 
   // Stages with cards
