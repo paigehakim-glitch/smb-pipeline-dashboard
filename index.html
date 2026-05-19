@@ -1218,26 +1218,42 @@ function renderDetailView() {
       var cd = new Date(d.closeDate + 'T00:00:00');
       if (cd < today) return;
       var sk = stageKeyMap[d.stage];
-      var prob = sk ? (fwdConvPct(pd, sk) || 0) : 0;
-      var entry = {account: d.account, stage: d.stage, closeDate: d.closeDate, prob: prob, amount: d.amount || 0};
+      var baseProb = sk ? (fwdConvPct(pd, sk) || 0) : 0;
+      // Blend base rate with deal health: health 100 = full base, health 0 = 20% of base
+      var health = dealHealthScore(d);
+      var multiplier = 0.2 + (health / 100) * 0.8;
+      var prob = Math.max(3, Math.round(baseProb * multiplier));
+      var risks = getRisks(d);
+      var hm = getHighMed(risks);
+      var entry = {account: d.account, stage: d.stage, closeDate: d.closeDate,
+        prob: prob, baseProb: baseProb, health: health,
+        highRisks: hm.high, medRisks: hm.med, amount: d.amount || 0};
       if (cd <= weekEnd) weekDeals.push(entry);
       else if (cd <= monthEnd) monthDeals.push(entry);
     });
-    weekDeals.sort(function(a,b){return a.closeDate.localeCompare(b.closeDate);});
-    monthDeals.sort(function(a,b){return a.closeDate.localeCompare(b.closeDate);});
+    weekDeals.sort(function(a,b){return b.prob - a.prob || a.closeDate.localeCompare(b.closeDate);});
+    monthDeals.sort(function(a,b){return b.prob - a.prob || a.closeDate.localeCompare(b.closeDate);});
 
     function fcastExpected(deals) {
       return deals.reduce(function(s,d){return s + d.prob/100;}, 0);
     }
     function fcastRow(d) {
-      var probColor = d.prob >= 70 ? '#276749' : d.prob >= 40 ? '#b7791f' : '#718096';
+      var probColor = d.prob >= 60 ? '#276749' : d.prob >= 30 ? '#b7791f' : '#c53030';
       var stageColor = STAGE_COLORS[d.stage] || '#718096';
       var mm = d.closeDate.slice(5,7), dd = d.closeDate.slice(8,10);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8">' +
+      var healthDot = d.health >= 75 ? '#48bb78' : d.health >= 50 ? '#ecc94b' : '#fc8181';
+      var riskNote = d.highRisks > 0 ? d.highRisks+' high risk' : d.medRisks > 0 ? d.medRisks+' flag'+(d.medRisks>1?'s':'') : '';
+      var tipText = esc(d.account.replace(' (Ultimate Parent)','')) +
+        ' | Base: ' + d.baseProb + '% &rarr; Adjusted: <b>' + d.prob + '%</b>' +
+        ' | Health: ' + d.health + '/100' +
+        (riskNote ? ' | <b>' + riskNote + '</b>' : '');
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0f4f8;cursor:default"' +
+        ' onmouseenter="showAeTip(event,\''+tipText+'\')" onmouseleave="hideAeTip()" onmousemove="moveAeTip(event)">' +
         '<div style="width:6px;height:6px;border-radius:50%;background:'+stageColor+';flex-shrink:0"></div>' +
         '<div style="flex:1;font-size:10px;color:#2d3748;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.account.replace(' (Ultimate Parent)','').replace(' (Ultimate parent)',''))+'</div>' +
+        '<div style="width:6px;height:6px;border-radius:50%;background:'+healthDot+';flex-shrink:0" title="Health '+d.health+'/100"></div>' +
         '<div style="font-size:9px;color:#718096;flex-shrink:0">'+mm+'/'+dd+'</div>' +
-        '<div style="font-size:10px;font-weight:700;color:'+probColor+';flex-shrink:0;min-width:30px;text-align:right">'+d.prob+'%</div>' +
+        '<div style="font-size:10px;font-weight:700;color:'+probColor+';flex-shrink:0;min-width:32px;text-align:right">'+d.prob+'%</div>' +
         '</div>';
     }
     function fcastBox(label, deals, bgColor) {
@@ -1263,7 +1279,7 @@ function renderDetailView() {
     html += fcastBox('This Week', weekDeals, '#fffff5');
     html += fcastBox('This Month', monthDeals, '#f7fafc');
     html += '</div>';
-    html += '<div style="font-size:9px;color:#a0aec0;margin-top:5px">% = est. stage → CW conversion &bull; deals past close date excluded</div>';
+    html += '<div style="font-size:9px;color:#a0aec0;margin-top:5px">% = rep stage rate &times; deal health (next step, activity, blockers, stage pace) &bull; hover for detail</div>';
     html += '</div>';
   }
 
